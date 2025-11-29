@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="PhonePolycomCX300" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/PhonePolycomCX300" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option host_application="D:/Dokumenty/_PROJEKTY/libre/tSIP/tSIP/Release_Build/tSIP.exe" />
+				<Option run_host_application_in_terminal="0" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-Wall" />
+					<Add option="-g" />
+					<Add option="-fshort-enums" />
+					<Add option="-DBUILD_DLL" />
+					<Add directory="jsoncpp/include" />
+				</Compiler>
+				<Linker>
+					<Add option="-Wl,--add-stdcall-alias" />
+					<Add library="user32" />
+				</Linker>
+				<ExtraCommands>
+					<Add after="cmd /c copy /Y $(TARGET_OUTPUT_FILE) D:\Dokumenty\_PROJEKTY\libre\tSIP\tSIP\Debug_Build\phone\PhonePolycomCX300.dll" />
+					<Add after="cmd /c copy /Y $(TARGET_OUTPUT_FILE) D:\Dokumenty\_PROJEKTY\libre\tSIP\tSIP\Release_Build\phone\PhonePolycomCX300.dll" />
+					<Mode after="always" />
+				</ExtraCommands>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/PhonePolycomCX300" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-O2" />
+					<Add option="-Wall" />
+					<Add option="-fshort-enums" />
+					<Add option="-DBUILD_DLL" />
+					<Add directory="jsoncpp/include" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+					<Add option="-Wl,--add-stdcall-alias" />
+					<Add library="user32" />
+				</Linker>
+				<ExtraCommands>
+					<Add after="cmd /c copy /Y $(TARGET_OUTPUT_FILE) D:\Dokumenty\_PROJEKTY\libre\tSIP\tSIP\Debug_Build\phone\PhonePolycomCX300.dll" />
+					<Add after="cmd /c copy /Y $(TARGET_OUTPUT_FILE) D:\Dokumenty\_PROJEKTY\libre\tSIP\tSIP\Release_Build\phone\PhonePolycomCX300.dll" />
+					<Mode after="always" />
+				</ExtraCommands>
+			</Target>
+		</Build>
+		<Linker>
+			<Add option="-lhid -lsetupapi" />
+		</Linker>
+		<Unit filename="CommThread.cpp" />
+		<Unit filename="CommThread.h" />
+		<Unit filename="CustomConf.cpp" />
+		<Unit filename="CustomConf.h" />
+		<Unit filename="HidDevice.cpp" />
+		<Unit filename="HidDevice.h" />
+		<Unit filename="Log.cpp" />
+		<Unit filename="Log.h" />
+		<Unit filename="Mutex.h" />
+		<Unit filename="Phone.cpp" />
+		<Unit filename="PolycomCX300.cpp" />
+		<Unit filename="PolycomCX300.h" />
+		<Unit filename="ScopedLock.h" />
+		<Unit filename="Utils.cpp" />
+		<Unit filename="Utils.h" />
+		<Unit filename="bin2str.cpp" />
+		<Unit filename="bin2str.h" />
+		<Unit filename="jsoncpp/include/json/json.h" />
+		<Unit filename="jsoncpp/include/json/reader.h" />
+		<Unit filename="jsoncpp/include/json/value.h" />
+		<Unit filename="jsoncpp/include/json/writer.h" />
+		<Unit filename="jsoncpp/src/lib_json/json_reader.cpp" />
+		<Unit filename="jsoncpp/src/lib_json/json_value.cpp" />
+		<Unit filename="jsoncpp/src/lib_json/json_writer.cpp" />
+		<Unit filename="main.cpp" />
+		<Unit filename="resource.rc">
+			<Option compilerVar="WINDRES" />
+		</Unit>
+		<Unit filename="singleton.h" />
+		<Extensions>
+			<code_completion />
+			<debugger />
+			<envvars />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

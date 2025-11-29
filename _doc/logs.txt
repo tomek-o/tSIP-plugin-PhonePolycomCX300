@@ -1,0 +1,91 @@
+// short presses: 0...9, *, #
+13:27:31.892 PhonePolycomCX300.dll: REPORT_IN received: 00 01 00 00 D5 5A 00 00	// 0
+13:27:32.092 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:38.996 PhonePolycomCX300.dll: REPORT_IN received: 00 02 00 00 D5 5A 00 00	// 1
+13:27:39.275 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:39.635 PhonePolycomCX300.dll: REPORT_IN received: 00 03 00 00 D5 5A 00 00
+13:27:39.836 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:40.043 PhonePolycomCX300.dll: REPORT_IN received: 00 04 00 00 D5 5A 00 00
+13:27:40.243 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:40.593 PhonePolycomCX300.dll: REPORT_IN received: 00 05 00 00 D5 5A 00 00
+13:27:40.793 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:41.143 PhonePolycomCX300.dll: REPORT_IN received: 00 06 00 00 D5 5A 00 00
+13:27:41.343 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:41.543 PhonePolycomCX300.dll: REPORT_IN received: 00 07 00 00 D5 5A 00 00
+13:27:41.743 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:42.096 PhonePolycomCX300.dll: REPORT_IN received: 00 08 00 00 D5 5A 00 00
+13:27:42.296 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:42.502 PhonePolycomCX300.dll: REPORT_IN received: 00 09 00 00 D5 5A 00 00
+13:27:42.702 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:42.939 PhonePolycomCX300.dll: REPORT_IN received: 00 0A 00 00 D5 5A 00 00
+13:27:43.139 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:46.798 PhonePolycomCX300.dll: REPORT_IN received: 00 0B 00 00 D5 5A 00 00	// *
+13:27:46.998 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+13:27:48.100 PhonePolycomCX300.dll: REPORT_IN received: 00 0C 00 00 D5 5A 00 00	// #
+13:27:48.300 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+
+// long presses (similar for 0...9, *, #):
+13:29:47.553 PhonePolycomCX300.dll: REPORT_IN received: 00 01 00 00 D5 5A 00 00	
+13:29:49.051 PhonePolycomCX300.dll: REPORT_IN received: 08 01 00 00 D5 5A 00 00	// 0
+13:29:50.906 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+
+// "keyboard" (= redial) button (only short press)
+13:30:53.312 PhonePolycomCX300.dll: REPORT_IN received: 04 00 00 00 D5 5A 00 00
+// pause/hold
+13:32:13.459 PhonePolycomCX300.dll: REPORT_IN received: 02 00 00 00 D5 5A 00 00
+// backspace (or button rejecting incoming call)
+13:32:46.315 PhonePolycomCX300.dll: REPORT_IN received: 20 00 00 00 D5 5A 00 00
+
+// picking up and putting down handset
+13:33:16.868 PhonePolycomCX300.dll: REPORT_IN received: 01 00 00 40 4E 80 00 00
+13:33:16.918 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 4E 80 00 00	// handset is up
+13:33:19.300 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00	// handset down
+
+// speaker button
+13:37:42.306 PhonePolycomCX300.dll: REPORT_IN received: 01 00 00 50 D5 5A 00 00
+13:37:42.356 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+
+// headset button
+13:38:50.044 PhonePolycomCX300.dll: REPORT_IN received: 01 00 00 60 3B 20 00 00
+13:38:50.094 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 3B 20 00 00
+
+// microphone button off->on, short press
+13:35:48.996 PhonePolycomCX300.dll: REPORT_IN received: 10 00 00 00 3B 20 01 00
+13:35:49.100 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 3B 20 01 00
+// microphone button on->off, short press
+13:36:12.331 PhonePolycomCX300.dll: REPORT_IN received: 10 00 00 00 3B 20 01 00
+13:36:12.382 PhonePolycomCX300.dll: REPORT_IN received: 10 00 00 00 3B 20 00 00
+13:36:12.432 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 3B 20 00 00
+
+// pressing volume up consequently, from minimum volume level, headset mode
+14:32:55.511 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 27 10 00 00
+14:32:56.463 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D1 16 00 00
+14:32:57.438 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 3B 20 00 00
+14:32:58.430 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 86 2D 00 00
+14:32:59.380 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 4E 40 00 00
+14:33:00.342 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+14:33:01.182 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 4E 80 00 00
+14:33:02.282 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 3C B5 00 00
+14:33:03.232 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 FF FF 00 00
+
+// pressing volume down consequently, from max volume level, headset mode
+14:33:37.886 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 3C B5 00 00
+14:33:38.686 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 4E 80 00 00
+14:33:39.422 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+14:33:40.230 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 4E 40 00 00
+14:33:40.894 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 86 2D 00 00
+14:33:41.544 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 3B 20 00 00
+14:33:42.344 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D1 16 00 00
+14:33:42.994 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 27 10 00 00
+14:33:43.886 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 70 0B 00 00
+
+// pressing volume up consequently, from minimum volume level, handset mode
+14:35:04.718 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 27 10 00 00
+14:35:05.430 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D1 16 00 00
+14:35:05.974 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 3B 20 00 00
+14:35:06.478 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 86 2D 00 00
+14:35:06.998 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 4E 40 00 00
+14:35:07.510 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 D5 5A 00 00
+14:35:07.942 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 4E 80 00 00
+14:35:08.374 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 3C B5 00 00
+14:35:09.024 PhonePolycomCX300.dll: REPORT_IN received: 00 00 00 00 FF FF 00 00
