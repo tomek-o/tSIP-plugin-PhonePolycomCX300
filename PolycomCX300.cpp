@@ -8,6 +8,7 @@
 
 void Key(int keyCode, int state);
 int RunScriptAsync(const char* script);
+int Redial(void);
 
 /*
 Note:
@@ -165,6 +166,9 @@ void HandleReportIn(const uint8_t *report) {
         } else {
             key = KEY_C;
         }
+        break;
+    case 0x04:  // Redial key - first one in the top row
+        Redial();
         break;
     case 0x02:  // HOLD key
         RunScriptAsync("ToggleHold()");

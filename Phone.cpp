@@ -26,6 +26,7 @@ CALLBACK_LOG lpLogFn = NULL;
 CALLBACK_CONNECT lpConnectFn = NULL;
 CALLBACK_KEY lpKeyFn = NULL;
 CALLBACK_RUN_SCRIPT_ASYNC lpRunScriptAsyncFn = NULL;
+CALLBACK_REDIAL lpRedialFn = NULL;
 
 void *callbackCookie;	///< used by upper class to distinguish library instances when receiving callbacks
 
@@ -52,6 +53,14 @@ void Key(int keyCode, int state) {
 int RunScriptAsync(const char* script) {
 	if (lpRunScriptAsyncFn) {
 		return lpRunScriptAsyncFn(callbackCookie, script);
+	}
+	return -1;
+}
+
+int Redial(void) {
+	if (lpRedialFn) {
+		lpRedialFn(callbackCookie);
+		return 0;
 	}
 	return -1;
 }
@@ -164,4 +173,8 @@ int Ring(int state) {
 
 void SetRunScriptAsyncCallback(CALLBACK_RUN_SCRIPT_ASYNC lpRunScriptAsync) {
 	lpRunScriptAsyncFn = lpRunScriptAsync;
+}
+
+void SetRedialCallback(CALLBACK_REDIAL lpRedial) {
+	lpRedialFn = lpRedial;
 }
