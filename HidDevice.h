@@ -15,6 +15,10 @@
 #ifndef HIDDEVICE_H_INCLUDED
 #define HIDDEVICE_H_INCLUDED
 
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <ddk/hidusage.h>
+#include <ddk/hidpi.h>
 #include <windef.h>
 #include <string>
 
@@ -28,7 +32,12 @@ namespace nsHidDevice {
         HANDLE hEventObject;
         void* pOverlapped;
         GUID hidGuid;        /* GUID for HID driver */
+        int VID, PID;
         std::string path;
+        int usagePage;
+        PHIDP_PREPARSED_DATA preparsedData;
+        unsigned long reportInLength;
+        unsigned long reportOutLength;
 
         int CreateReadWriteHandles(std::string path);
 
@@ -62,15 +71,15 @@ namespace nsHidDevice {
             E_REPORT_FEATURE
         };
 
-        HidDevice();
-        ~HidDevice();
+        HidDevice(void);
+        ~HidDevice(void);
 
-        void GetHidGuid(GUID *guid);
-        HANDLE GetHandle(void) {
+        void GetHidGuid(GUID *guid) const;
+        HANDLE GetHandle(void) const {
             return handle;
         }
 
-        std::string GetPath(void) {
+        std::string GetPath(void) const {
             return path;
         }
 
@@ -82,7 +91,7 @@ namespace nsHidDevice {
             \param productName required product name string, ignored if NULL
             \return 0 on success
         */
-        int Open(int VID, int PID, char *vendorName, char *productName);
+        int Open(int VID, int PID, char *vendorName, char *productName, int usagePage);
 
         bool IsOpened(void) const;
 
@@ -107,6 +116,17 @@ namespace nsHidDevice {
         /** \brief Close connection to device
         */
         void Close(void);
+        int GetVid(void) const {
+            return VID;
+        }
+
+        int GetPid(void) const {
+            return PID;
+        }
+
+        int GetUsagePage(void) const {
+            return usagePage;
+        }
     };
 
 };

@@ -39,6 +39,8 @@ namespace
 
 const int VendorID = 0x095d;
 const int ProductID = 0x9201;
+const int BasicUsagePage = 0x0B;
+const int DisplayUsagePage = 0xFF99;
 
 /* https://github.com/probonopd/OpenPhone */
 const uint8_t STATUS_AVAILABLE[] = {0x16, 0x01};
@@ -82,7 +84,7 @@ std::string callDisplay;
 bool displayUpdateFlag = false;
 bool ringUpdateFlag = false;
 
-HidDevice hidDevice;
+HidDevice hidDevice, hidDeviceDisplay;
 
 const E_KEY KEY_NONE = static_cast<E_KEY>(-1);
 enum E_KEY lastKey = KEY_NONE;
@@ -198,7 +200,7 @@ int ClearDisplay(HidDevice &dev) {
     return dev.WriteReportOut(DISPLAY_CLEAR, sizeof(DISPLAY_CLEAR));
 }
 
-int SetDisplayTwoLines(HidDevice &dev, const std::string &line1, const std::string &line2="") {
+int SetDisplayTwoLines(HidDevice &dev, HidDevice &displayDev, const std::string &line1, const std::string &line2="") {
     int status = 0;
 
     status = dev.WriteReportOut(TEXT_MODE_TWO_LINES, sizeof(TEXT_MODE_TWO_LINES));
@@ -209,7 +211,7 @@ int SetDisplayTwoLines(HidDevice &dev, const std::string &line1, const std::stri
         std::string text;
         if (i == 0) {
             text = line1;
-            status = dev.WriteReportOut(TEXT_TOP_LINE, sizeof(TEXT_TOP_LINE));
+            status = dev.WriteReportOut(TEXT_TOP_LINE, 2); //sizeof(TEXT_TOP_LINE));
             if (status != 0) {
                 // when trying to write 3 bytes: GetLastError = 1784 (The supplied user buffer is not valid for the requested operation.)
                 LOG("Error writing TEXT_TOP_LINE");
@@ -217,7 +219,7 @@ int SetDisplayTwoLines(HidDevice &dev, const std::string &line1, const std::stri
             }
         } else {
             text = line2;
-            status = dev.WriteReportOut(TEXT_BOTTOM_LINE, sizeof(TEXT_BOTTOM_LINE));
+            status = dev.WriteReportOut(TEXT_BOTTOM_LINE, 2); //sizeof(TEXT_BOTTOM_LINE));
             if (status != 0) {
                 LOG("Error writing TEXT_BOTTOM_LINE");
                 return status;
@@ -250,7 +252,7 @@ int SetDisplayTwoLines(HidDevice &dev, const std::string &line1, const std::stri
             }
         #if 1
             // trying to write 18 bytes: this works under Linux but not under Windows 7/10
-            status = dev.WriteReportOut(buffer, sizeof(buffer));
+            status = displayDev.WriteReportOut(buffer, sizeof(buffer));
             if (status != 0) {
                 LOG("Error trying to write whole buffer");
                 return status;
@@ -271,7 +273,7 @@ int SetDisplayTwoLines(HidDevice &dev, const std::string &line1, const std::stri
     return status;
 }
 
-int UpdateDisplay(HidDevice &dev) {
+int UpdateDisplay(HidDevice &dev, HidDevice &displayDev) {
     int status;
 
     displayUpdateFlag = false;
@@ -287,7 +289,7 @@ int UpdateDisplay(HidDevice &dev) {
     }
 #endif
 
-    status = SetDisplayTwoLines(dev, "abc", "123");
+    status = SetDisplayTwoLines(dev, displayDev, "abc", "123");
 
     if (status != 0) {
         LOG("UpdateDisplay status/error = %d", status);
@@ -343,9 +345,16 @@ void PolycomCX300::Poll(void) {
     static unsigned int loopCnt = 0;
     if (!hidDevice.IsOpened()) {
         if (loopCnt % 100 == 0) {
-            int status = hidDevice.Open(VendorID, ProductID, NULL, NULL);
+            int status = hidDevice.Open(VendorID, ProductID, NULL, NULL, BasicUsagePage);
             if (status == 0) {
-                LOG("HID device connected");
+                LOG("HID device for telephony connected");
+                status = hidDeviceDisplay.Open(VendorID, ProductID, NULL, NULL, DisplayUsagePage);
+                if (status != 0) {
+                    LOG("Failed to open display HID device");
+                    hidDevice.Close();
+                } else {
+                    LOG("HID device for display connected");
+                }
 
                 if (customConf.detailedLogging) {
                     static bool once = false;
@@ -360,6 +369,7 @@ void PolycomCX300::Poll(void) {
                 status = SendKeepalive(hidDevice);
                 if (status != 0) {
                     hidDevice.Close();
+                    hidDeviceDisplay.Close();
                 }
 
                 ClearDisplay(hidDevice);
@@ -372,6 +382,7 @@ void PolycomCX300::Poll(void) {
                     if (status != 0) {
                         LOG("Error writing LED pattern");
                         hidDevice.Close();
+                        hidDeviceDisplay.Close();
                         break;
                     }
                     Sleep(300);
@@ -408,9 +419,9 @@ void PolycomCX300::Poll(void) {
         if (status == 0 && ((loopCnt & 0x1FF) == 0)) {
             status = SendKeepalive(hidDevice);
         }
-#if 0
+#if 1
         if (status == 0 && displayUpdateFlag) {
-            status = UpdateDisplay(hidDevice);
+            status = UpdateDisplay(hidDevice, hidDeviceDisplay);
         }
 #endif
         if (status == 0 && ringUpdateFlag) {
@@ -420,6 +431,7 @@ void PolycomCX300::Poll(void) {
         if (status) {
             LOG("Error updating, %s", HidDevice::GetErrorDesc(status).c_str());
             hidDevice.Close();
+            hidDeviceDisplay.Close();
         } else {
             unsigned char rcvbuf[REPORT_IN_SIZE];
             memset(rcvbuf, 0, sizeof(rcvbuf));
@@ -437,6 +449,7 @@ void PolycomCX300::Poll(void) {
             } else if (status != HidDevice::E_ERR_TIMEOUT) {
                 LOG("Error reading report");
                 hidDevice.Close();
+                hidDeviceDisplay.Close();
             }
         }
     }
@@ -445,6 +458,7 @@ void PolycomCX300::Poll(void) {
 
 void PolycomCX300::Close(void) {
     hidDevice.Close();
+    hidDeviceDisplay.Close();
 }
 
 

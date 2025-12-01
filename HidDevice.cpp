@@ -1,31 +1,3 @@
-/** \file
-    \note endpoint size = 64B = const
-*/
-
-/*
-	Copyright 2009 Tomasz Ostrowski, http://tomeko.net. All rights reserved.
-
-	Redistribution and use in source and binary forms, with or without modification, are
-	permitted provided that the following conditions are met:
-
-	   1. Redistributions of source code must retain the above copyright notice, this list of
-		  conditions and the following disclaimer.
-
-	   2. Redistributions in binary form must reproduce the above copyright notice, this list
-		  of conditions and the following disclaimer in the documentation and/or other materials
-		  provided with the distribution.
-
-	THIS SOFTWARE IS PROVIDED 'AS IS' AND ANY EXPRESS OR IMPLIED
-	WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
-	FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER OR
-	CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-	CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-	SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-	ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-	NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-	ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
 #include "HidDevice.h"
 #include "Log.h"
 #include "bin2str.h"
@@ -91,29 +63,37 @@ void HidDevice::UnicodeToAscii(char *buffer)
     *ascii++ = 0;
 }
 
-HidDevice::HidDevice():
+HidDevice::HidDevice(void):
         handle(INVALID_HANDLE_VALUE),
         readHandle(INVALID_HANDLE_VALUE),
         writeHandle(INVALID_HANDLE_VALUE),
-        hEventObject(NULL)
+        hEventObject(NULL),
+        VID(0),
+        PID(0),
+        usagePage(-1),
+        preparsedData(NULL),
+        reportInLength(0),
+        reportOutLength(0)
 {
     pOverlapped = new OVERLAPPED;
     HidD_GetHidGuid(&hidGuid);
 }
 
-HidDevice::~HidDevice()
+HidDevice::~HidDevice(void)
 {
     OVERLAPPED *o = (OVERLAPPED*)pOverlapped;
     delete o;
+    if (preparsedData)
+        HidD_FreePreparsedData(preparsedData);
     Close();
 }
 
-void HidDevice::GetHidGuid(GUID *guid)
+void HidDevice::GetHidGuid(GUID *guid) const
 {
     *guid = hidGuid;
 }
 
-int HidDevice::Open(int VID, int PID, char *vendorName, char *productName)
+int HidDevice::Open(int VID, int PID, char *vendorName, char *productName, int usagePage)
 {
     HDEVINFO                            deviceInfoList;
     SP_DEVICE_INTERFACE_DATA            deviceInfo;
@@ -123,6 +103,7 @@ int HidDevice::Open(int VID, int PID, char *vendorName, char *productName)
     int                                 errorCode = E_ERR_NOTFOUND;
     HIDD_ATTRIBUTES                     deviceAttributes;
 
+    this->usagePage = usagePage;
     deviceInfoList = SetupDiGetClassDevs(&hidGuid, NULL, NULL, DIGCF_PRESENT | DIGCF_INTERFACEDEVICE);
     deviceInfo.cbSize = sizeof(deviceInfo);
     for (i=0;;i++)
@@ -153,7 +134,10 @@ int HidDevice::Open(int VID, int PID, char *vendorName, char *productName)
         // check VID + PID
         deviceAttributes.Size = sizeof(deviceAttributes);
         HidD_GetAttributes(handle, &deviceAttributes);
-        if (deviceAttributes.VendorID != VID || deviceAttributes.ProductID != PID)
+        //LOG("Found device VID = %04X, PID = %04X, path = %s", deviceAttributes.VendorID, deviceAttributes.ProductID, deviceDetails->DevicePath);
+        if (VID != 0 && deviceAttributes.VendorID != VID)
+            continue;
+        if (PID != 0 && deviceAttributes.ProductID != PID)
             continue;
 
         errorCode = E_ERR_NOTFOUND;
@@ -181,6 +165,34 @@ int HidDevice::Open(int VID, int PID, char *vendorName, char *productName)
             if (strcmp(productName, buffer) != 0)
                 continue;
         }
+
+        if (usagePage >= 0)
+        {
+            // returns a pointer to a buffer containing the information about the device's capabilities.
+            if (HidD_GetPreparsedData(handle, &preparsedData) == FALSE) {
+                errorCode = E_ERR_IO;
+                continue;
+            }
+
+            HIDP_CAPS Capabilities;
+            if (HidP_GetCaps(preparsedData, &Capabilities) != HIDP_STATUS_SUCCESS) {
+                errorCode = E_ERR_IO;
+                continue;
+            }
+            LOG("Device UsagePage = 0x%X", Capabilities.UsagePage);
+            if (Capabilities.UsagePage != usagePage /*0x0b*/)
+                continue;
+
+            this->VID = deviceAttributes.VendorID;
+            this->PID = deviceAttributes.ProductID;
+
+            reportInLength = Capabilities.InputReportByteLength;
+            reportOutLength = Capabilities.OutputReportByteLength;
+
+            HidD_FlushQueue(handle);
+
+        }
+
         break;
     }
 
@@ -208,16 +220,20 @@ int HidDevice::CreateReadWriteHandles(std::string path)
         OPEN_EXISTING,
         0,
         NULL);
-    if (writeHandle == INVALID_HANDLE_VALUE)
+    if (writeHandle == INVALID_HANDLE_VALUE) {
+        LOG("Failed to create write handle!");
         return E_ERR_IO;
+    }
 	readHandle = CreateFile	(path.c_str(), GENERIC_READ,
 		FILE_SHARE_READ|FILE_SHARE_WRITE,
 		(LPSECURITY_ATTRIBUTES)NULL,
 		OPEN_EXISTING,
 		FILE_FLAG_OVERLAPPED,
 		NULL);
-    if (readHandle == INVALID_HANDLE_VALUE)
+    if (readHandle == INVALID_HANDLE_VALUE) {
+        LOG("Failed to create read handle!");
         return E_ERR_IO;
+    }
 
 	if (hEventObject == 0)
 	{
@@ -226,8 +242,10 @@ int HidDevice::CreateReadWriteHandles(std::string path)
 			TRUE,   // manual reset (call ResetEvent)
 			TRUE,   // initial state = signaled
 			"");    // name
-        if (hEventObject == NULL)
+        if (hEventObject == NULL) {
+            LOG("Failed to create event handle!");
             return E_ERR_OTHER;
+        }
         ((OVERLAPPED*)pOverlapped)->hEvent = hEventObject;
         ((OVERLAPPED*)pOverlapped)->Offset = 0;
         ((OVERLAPPED*)pOverlapped)->OffsetHigh = 0;
@@ -245,11 +263,13 @@ int HidDevice::DumpCapabilities(std::string &dump)
         return E_ERR_IO;
 
     HIDP_CAPS Capabilities;
-    if (HidP_GetCaps(PreparsedData, &Capabilities) != HIDP_STATUS_SUCCESS)
+    if (HidP_GetCaps(PreparsedData, &Capabilities) != HIDP_STATUS_SUCCESS) {
+        LOG("HidP_GetCaps failed!");
         return E_ERR_IO;
+    }
 
     std::stringstream stream;
-    stream << "Usage Page: " << hex << Capabilities.UsagePage << endl;
+    stream << "Usage Page: 0x" << hex << Capabilities.UsagePage << endl;
     stream << dec;
     stream << "Input Report Byte Length: " << Capabilities.InputReportByteLength << endl;
     stream << "Output Report Byte Length: " << Capabilities.OutputReportByteLength << endl;
@@ -293,7 +313,7 @@ int HidDevice::WriteReport(enum E_REPORT_TYPE type, int id, const unsigned char 
 {
     BOOL status = 0;
     DWORD bytesWritten = 0;
-    char sendbuf[65];
+    unsigned char sendbuf[65];
     memset(sendbuf, 0, sizeof(sendbuf));
     sendbuf[0] = id;
     assert (len < (int)sizeof(sendbuf));
@@ -301,6 +321,8 @@ int HidDevice::WriteReport(enum E_REPORT_TYPE type, int id, const unsigned char 
 
     switch (type)
     {
+    case E_REPORT_IN:
+        return E_ERR_INV_PARAM;
     case E_REPORT_OUT:
         status = WriteFile(writeHandle, sendbuf, len+1, &bytesWritten, NULL);
         break;
