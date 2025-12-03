@@ -332,6 +332,23 @@ int HidDevice::WriteReport(enum E_REPORT_TYPE type, int id, const unsigned char 
     default:
         return E_ERR_INV_PARAM;
     }
+
+    if (status == FALSE) {
+        LPVOID lpMsgBuf;
+        DWORD dw = GetLastError();
+        FormatMessage(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER |
+            FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL,
+            dw,
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPTSTR) &lpMsgBuf,
+            0, NULL );
+        LOG("Error: WriteReport, len = %d, HEX: %s, GetLastError = %d (%s)", len+1, BufToHexString(sendbuf, len+1).c_str(), dw, (LPCTSTR)lpMsgBuf);
+        LocalFree(lpMsgBuf);
+    }
+
     return status == 0 ? E_ERR_IO : 0;
 }
 
@@ -340,6 +357,7 @@ int HidDevice::WriteReportOut(const unsigned char *buffer, int len)
     BOOL status = FALSE;
     DWORD   bytesWritten = 0;
 
+    SetLastError(0);
     status = WriteFile(writeHandle, buffer, len, &bytesWritten, NULL);
 
     if (status == FALSE) {
@@ -354,8 +372,7 @@ int HidDevice::WriteReportOut(const unsigned char *buffer, int len)
             MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
             (LPTSTR) &lpMsgBuf,
             0, NULL );
-        LOG("Error: WriteReportOut, len = %d, HEX: %s", len, BufToHexString(buffer, len).c_str());
-        LOG("GetLastError = %d (%s)", dw, (LPCTSTR)lpMsgBuf);
+        LOG("Error: WriteReportOut, len = %d, HEX: %s, GetLastError = %d (%s)", len, BufToHexString(buffer, len).c_str(), dw, (LPCTSTR)lpMsgBuf);
         LocalFree(lpMsgBuf);
     }
     return status == FALSE ? E_ERR_IO : 0;
