@@ -171,6 +171,11 @@ int Ring(int state) {
     return 0;
 }
 
+int SetMwi(int accountId, unsigned int newMsg, unsigned int oldMsg) {
+    UpdateMwi(accountId, newMsg, oldMsg);
+    return 0;
+}
+
 void SetRunScriptAsyncCallback(CALLBACK_RUN_SCRIPT_ASYNC lpRunScriptAsync) {
 	lpRunScriptAsyncFn = lpRunScriptAsync;
 }

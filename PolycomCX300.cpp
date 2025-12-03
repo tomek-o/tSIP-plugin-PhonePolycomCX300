@@ -85,6 +85,7 @@ int ringState = 0;
 std::string callDisplay;
 bool displayUpdateFlag = false;
 bool ringUpdateFlag = false;
+unsigned int mwiNewMessages = 0;
 
 HidDevice hidDevice, hidDeviceDisplay;
 
@@ -300,22 +301,12 @@ int SetDisplayTwoLines(HidDevice &dev, HidDevice &displayDev, const std::string 
 
 int UpdateDisplay(HidDevice &dev, HidDevice &displayDev) {
     int status;
-
-    //LOG("UpdateDisplay");
-
     displayUpdateFlag = false;
 
     std::string callDisplayVal = GetCallDisplay();
 
     status = 0;
-
-#if 0
-    // redundant and causes some flickering
-    status = ClearDisplay(dev);
-    if (status != 0) {
-        LOG("ClearDisplay error %d", status);
-    }
-#endif
+    /** \note Do not clear display here - it is redundant and causes flickering */
 
     char line1[32];
     char line2[32];
@@ -353,6 +344,7 @@ int UpdateRing(HidDevice &dev) {
     return status;
 }
 
+
 int SendKeepalive(HidDevice &dev) {
     // Send feature report - without this the phone asks to upgrade Office Communicator
     // report id = 0x17, language (0x09 = EN)
@@ -366,7 +358,7 @@ int SendKeepalive(HidDevice &dev) {
     return status;
 }
 
-int SetLed(HidDevice &dev, const uint8_t *leds) {
+int SetLed(HidDevice &dev, const uint8_t *leds, bool voicemail) {
     // According to Wireshark this sends 3 bytes, not 2.
     // Python with cx300.py and hid/hidapi behaves the same way under Windows.
     // WTF?
@@ -376,13 +368,19 @@ int SetLed(HidDevice &dev, const uint8_t *leds) {
     uint8_t buf[64];
     memset(buf, 0, sizeof(buf));
     memcpy(buf, leds, sizeof(STATUS_LED_GREEN));
+    // buf[2]: 0x10 = mute, 0x06 = voicemail LED
+    if (voicemail) {
+        buf[2] |= 0x06;
+    }
     int status;
     status = hidDevice.WriteReportOut(buf, sizeof(STATUS_LED_GREEN));
     //status = hidDevice.WriteReport(HidDevice::E_REPORT_OUT, 0, STATUS_LED_GREEN, sizeof(STATUS_LED_GREEN));
     return status;
 }
 
-}
+}   // namespace
+
+
 
 void PolycomCX300::Poll(void) {
     static unsigned int loopCnt = 0;
@@ -421,7 +419,7 @@ void PolycomCX300::Poll(void) {
                                             STATUS_LED_ORANGE, STATUS_LED_GREEN_ORANGE, STATUS_LED_OFF  };
                 for (unsigned int i=0; i<sizeof(leds)/sizeof(leds[0]); i++) {
                     //LOG("Writing LED pattern #%u", i);
-                    status = SetLed(hidDevice, leds[i]);
+                    status = SetLed(hidDevice, leds[i], false);
                     if (status != 0) {
                         LOG("Error writing LED pattern");
                         hidDevice.Close();
@@ -441,22 +439,22 @@ void PolycomCX300::Poll(void) {
             if ((loopCnt & 0x03) == 0) {
                 // updating time
                 displayUpdateFlag = true;
-                //LOG("UpdateDisplay for time requested");
             }
         }
 
         if ((loopCnt & 0x03) == 0) {
+            bool voicemail = (mwiNewMessages > 0);
             if (ringState) {
                 if ((loopCnt & 0x07) == 0) {
-                    status = SetLed(hidDevice, STATUS_LED_RED);
+                    status = SetLed(hidDevice, STATUS_LED_RED, voicemail);
                 } else {
-                    status = SetLed(hidDevice, STATUS_LED_OFF);
+                    status = SetLed(hidDevice, STATUS_LED_OFF, voicemail);
                 }
             } else {
                 if (regState)
-                    status = SetLed(hidDevice, STATUS_LED_GREEN);
+                    status = SetLed(hidDevice, STATUS_LED_GREEN, voicemail);
                 else
-                    status = SetLed(hidDevice, STATUS_LED_OFF);
+                    status = SetLed(hidDevice, STATUS_LED_OFF, voicemail);
             }
         }
 
@@ -523,6 +521,10 @@ void UpdateRing(int state) {
     }
     //LOG("ringState = %d", ringState);
     // Does CX300 has a ringer? Probably not.
+}
+
+void UpdateMwi(int accountId, unsigned int newMsg, unsigned int oldMsg) {
+    mwiNewMessages = newMsg;
 }
 
 void UpdateRegistrationState(int state) {

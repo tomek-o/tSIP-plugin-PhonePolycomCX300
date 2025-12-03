@@ -10,5 +10,6 @@ namespace PolycomCX300
 void UpdateRegistrationState(int state);
 void UpdateCallState(int state, const char* display);
 void UpdateRing(int state);
+void UpdateMwi(int accountId, unsigned int newMsg, unsigned int oldMsg);
 
 #endif
