@@ -323,6 +323,10 @@ int UpdateDisplay(HidDevice &dev, HidDevice &displayDev) {
     } else {
         strncpy(line1, callDisplayVal.c_str(), sizeof(line1)-1);
     }
+    if (line1[0] == '\0')
+        line1[0] = ' ';
+    if (line2[0] == '\0')
+        line2[0] = ' ';
     status = SetDisplayTwoLines(dev, displayDev, line1, line2);
 
     if (status != 0) {
