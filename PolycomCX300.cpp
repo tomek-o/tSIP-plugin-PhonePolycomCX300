@@ -5,6 +5,7 @@
 #include "Mutex.h"
 #include "ScopedLock.h"
 #include "..\tSIP\tSIP\phone\Phone.h"
+#include <time.h>
 
 void Key(int keyCode, int state);
 int RunScriptAsync(const char* script);
@@ -89,6 +90,7 @@ HidDevice hidDevice, hidDeviceDisplay;
 
 const E_KEY KEY_NONE = static_cast<E_KEY>(-1);
 enum E_KEY lastKey = KEY_NONE;
+enum E_KEY lastLongKey = KEY_NONE;
 bool lastOffHook = false;
 
 #	define DET_LOG if (customConf.detailedLogging) LOG
@@ -98,6 +100,10 @@ std::string GetCallDisplay(void) {
     return callDisplay;
 }
 
+/**
+    Third byte = 0x03 => phone is receiving audio
+    Fourth byte: type of audio device (handset/spkeaker/headset)
+*/
 void HandleReportIn(const uint8_t *report) {
     enum E_KEY key = KEY_NONE;
 
@@ -188,6 +194,21 @@ void HandleReportIn(const uint8_t *report) {
     if (key == lastKey && (report[0] & 0x08)) {
         // long key press
         DET_LOG("Key code = %d, long press", key);
+        if (key == KEY_1) {
+            if (lastLongKey != KEY_VOICEMAIL) {
+                Key(KEY_C, 1);
+                Sleep(50);
+                Key(KEY_C, 0);
+                Sleep(50);
+                Key(KEY_VOICEMAIL, 1);
+                Sleep(50);
+                Key(KEY_VOICEMAIL, 0);
+                Sleep(50);
+                lastLongKey = KEY_VOICEMAIL;
+            }
+        }
+    } else {
+        lastLongKey = KEY_NONE;
     }
 
     lastKey = key;
@@ -280,20 +301,38 @@ int SetDisplayTwoLines(HidDevice &dev, HidDevice &displayDev, const std::string 
 int UpdateDisplay(HidDevice &dev, HidDevice &displayDev) {
     int status;
 
+    //LOG("UpdateDisplay");
+
     displayUpdateFlag = false;
 
     std::string callDisplayVal = GetCallDisplay();
 
     status = 0;
 
-#if 1
+#if 0
+    // redundant and causes some flickering
     status = ClearDisplay(dev);
     if (status != 0) {
         LOG("ClearDisplay error %d", status);
     }
 #endif
 
-    status = SetDisplayTwoLines(dev, displayDev, "abc", "123");
+    char line1[32];
+    char line2[32];
+    memset(line1, 0, sizeof(line1));
+    memset(line2, 0, sizeof(line2));
+
+    if (callState == 0 && callDisplay.empty()) {
+        time_t rawtime;
+        struct tm * timeinfo;
+        time (&rawtime);
+        timeinfo = localtime (&rawtime);
+        strftime (line1, sizeof(line1), "%A %Y-%m-%d", timeinfo);
+        strftime (line2, sizeof(line2), "%H:%M:%S", timeinfo);
+    } else {
+        strncpy(line1, callDisplayVal.c_str(), sizeof(line1)-1);
+    }
+    status = SetDisplayTwoLines(dev, displayDev, line1, line2);
 
     if (status != 0) {
         LOG("UpdateDisplay status/error = %d", status);
@@ -348,7 +387,7 @@ int SetLed(HidDevice &dev, const uint8_t *leds) {
 void PolycomCX300::Poll(void) {
     static unsigned int loopCnt = 0;
     if (!hidDevice.IsOpened()) {
-        if (loopCnt % 100 == 0) {
+        if (loopCnt % 200 == 0) {
             int status = hidDevice.Open(VendorID, ProductID, NULL, NULL, BasicUsagePage);
             if (status == 0) {
                 LOG("HID device for telephony connected");
@@ -402,6 +441,7 @@ void PolycomCX300::Poll(void) {
             if ((loopCnt & 0x03) == 0) {
                 // updating time
                 displayUpdateFlag = true;
+                //LOG("UpdateDisplay for time requested");
             }
         }
 
@@ -440,7 +480,7 @@ void PolycomCX300::Poll(void) {
             unsigned char rcvbuf[REPORT_IN_SIZE];
             memset(rcvbuf, 0, sizeof(rcvbuf));
             int size = sizeof(rcvbuf);
-            int status = hidDevice.ReadReport(HidDevice::E_REPORT_IN, 0, (char*)rcvbuf, &size, 100);
+            int status = hidDevice.ReadReport(HidDevice::E_REPORT_IN, 0, (char*)rcvbuf, &size, 10);
             if (status == 0) {
                 if (size == sizeof(rcvbuf)) {
                     DET_LOG("REPORT_IN received: %02X %02X %02X %02X %02X %02X %02X %02X",
@@ -461,6 +501,9 @@ void PolycomCX300::Poll(void) {
 }
 
 void PolycomCX300::Close(void) {
+    if (hidDevice.IsOpened() && hidDeviceDisplay.IsOpened()) {
+        SetDisplayTwoLines(hidDevice, hidDeviceDisplay, "Softphone closed", "");
+    }
     hidDevice.Close();
     hidDeviceDisplay.Close();
 }
