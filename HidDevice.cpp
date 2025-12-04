@@ -20,6 +20,38 @@ extern "C"
 using namespace nsHidDevice;
 using namespace std;
 
+
+namespace
+{
+std::string GetLastErrorMessage(DWORD dw)
+{
+    LPVOID lpMsgBuf = NULL;
+    int rc = FormatMessage(
+                 FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                 FORMAT_MESSAGE_FROM_SYSTEM |
+                 FORMAT_MESSAGE_IGNORE_INSERTS,
+                 NULL,
+                 dw,
+                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                 //MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),	// fails on one of my PC - probably requires language package
+                 (LPTSTR) &lpMsgBuf,
+                 0, NULL );
+    if (rc == 0)
+    {
+        if (lpMsgBuf)
+            LocalFree(lpMsgBuf);
+        return "FormatMessage failed!";
+    }
+    std::string msg = (LPCTSTR)lpMsgBuf;
+    // remove trailing newline
+    msg.erase(std::remove(msg.begin(), msg.end(), '\r'), msg.end());
+    msg.erase(std::remove(msg.begin(), msg.end(), '\n'), msg.end());
+    LocalFree(lpMsgBuf);
+    return msg;
+}
+}
+
+
 HidDevice::SERROR HidDevice::tabErrorsName[E_ERR_LIMIT] =
 {
     { E_ERR_INV_PARAM,                  "Invalid parameter" },
@@ -35,8 +67,6 @@ std::string HidDevice::GetErrorDesc(int ErrorCode)
 {
     int a=0;
     std::stringstream stream;
-    //stream << (std::string)"B³¹d ";
-    //stream << static_cast<int>(ErrorCode) + ". ";
     while (tabErrorsName[a].nCode > 0)
     {
         if (tabErrorsName[a].nCode == ErrorCode)
@@ -64,16 +94,16 @@ void HidDevice::UnicodeToAscii(char *buffer)
 }
 
 HidDevice::HidDevice(void):
-        handle(INVALID_HANDLE_VALUE),
-        readHandle(INVALID_HANDLE_VALUE),
-        writeHandle(INVALID_HANDLE_VALUE),
-        hEventObject(NULL),
-        VID(0),
-        PID(0),
-        usagePage(-1),
-        preparsedData(NULL),
-        reportInLength(0),
-        reportOutLength(0)
+    handle(INVALID_HANDLE_VALUE),
+    readHandle(INVALID_HANDLE_VALUE),
+    writeHandle(INVALID_HANDLE_VALUE),
+    hEventObject(NULL),
+    VID(0),
+    PID(0),
+    usagePage(-1),
+    preparsedData(NULL),
+    reportInLength(0),
+    reportOutLength(0)
 {
     pOverlapped = new OVERLAPPED;
     HidD_GetHidGuid(&hidGuid);
@@ -106,7 +136,7 @@ int HidDevice::Open(int VID, int PID, char *vendorName, char *productName, int u
     this->usagePage = usagePage;
     deviceInfoList = SetupDiGetClassDevs(&hidGuid, NULL, NULL, DIGCF_PRESENT | DIGCF_INTERFACEDEVICE);
     deviceInfo.cbSize = sizeof(deviceInfo);
-    for (i=0;;i++)
+    for (i=0;; i++)
     {
         if (handle != INVALID_HANDLE_VALUE)
         {
@@ -169,13 +199,15 @@ int HidDevice::Open(int VID, int PID, char *vendorName, char *productName, int u
         if (usagePage >= 0)
         {
             // returns a pointer to a buffer containing the information about the device's capabilities.
-            if (HidD_GetPreparsedData(handle, &preparsedData) == FALSE) {
+            if (HidD_GetPreparsedData(handle, &preparsedData) == FALSE)
+            {
                 errorCode = E_ERR_IO;
                 continue;
             }
 
             HIDP_CAPS Capabilities;
-            if (HidP_GetCaps(preparsedData, &Capabilities) != HIDP_STATUS_SUCCESS) {
+            if (HidP_GetCaps(preparsedData, &Capabilities) != HIDP_STATUS_SUCCESS)
+            {
                 errorCode = E_ERR_IO;
                 continue;
             }
@@ -208,49 +240,53 @@ int HidDevice::Open(int VID, int PID, char *vendorName, char *productName, int u
     return errorCode;
 }
 
-bool HidDevice::IsOpened(void) const {
+bool HidDevice::IsOpened(void) const
+{
     return (handle != INVALID_HANDLE_VALUE);
 }
 
 int HidDevice::CreateReadWriteHandles(std::string path)
 {
     writeHandle = CreateFile (path.c_str(), GENERIC_WRITE,
-        FILE_SHARE_READ|FILE_SHARE_WRITE,
-        (LPSECURITY_ATTRIBUTES)NULL,
-        OPEN_EXISTING,
-        0,
-        NULL);
-    if (writeHandle == INVALID_HANDLE_VALUE) {
+                              FILE_SHARE_READ|FILE_SHARE_WRITE,
+                              (LPSECURITY_ATTRIBUTES)NULL,
+                              OPEN_EXISTING,
+                              0,
+                              NULL);
+    if (writeHandle == INVALID_HANDLE_VALUE)
+    {
         LOG("Failed to create write handle!");
         return E_ERR_IO;
     }
-	readHandle = CreateFile	(path.c_str(), GENERIC_READ,
-		FILE_SHARE_READ|FILE_SHARE_WRITE,
-		(LPSECURITY_ATTRIBUTES)NULL,
-		OPEN_EXISTING,
-		FILE_FLAG_OVERLAPPED,
-		NULL);
-    if (readHandle == INVALID_HANDLE_VALUE) {
+    readHandle = CreateFile	(path.c_str(), GENERIC_READ,
+                             FILE_SHARE_READ|FILE_SHARE_WRITE,
+                             (LPSECURITY_ATTRIBUTES)NULL,
+                             OPEN_EXISTING,
+                             FILE_FLAG_OVERLAPPED,
+                             NULL);
+    if (readHandle == INVALID_HANDLE_VALUE)
+    {
         LOG("Failed to create read handle!");
         return E_ERR_IO;
     }
 
-	if (hEventObject == 0)
-	{
-		hEventObject = CreateEvent
-			(NULL,  // security
-			TRUE,   // manual reset (call ResetEvent)
-			TRUE,   // initial state = signaled
-			"");    // name
-        if (hEventObject == NULL) {
+    if (hEventObject == 0)
+    {
+        hEventObject = CreateEvent
+                       (NULL,  // security
+                        TRUE,   // manual reset (call ResetEvent)
+                        TRUE,   // initial state = signaled
+                        "");    // name
+        if (hEventObject == NULL)
+        {
             LOG("Failed to create event handle!");
             return E_ERR_OTHER;
         }
         ((OVERLAPPED*)pOverlapped)->hEvent = hEventObject;
         ((OVERLAPPED*)pOverlapped)->Offset = 0;
         ((OVERLAPPED*)pOverlapped)->OffsetHigh = 0;
-	}
-	return 0;
+    }
+    return 0;
 }
 
 
@@ -263,7 +299,8 @@ int HidDevice::DumpCapabilities(std::string &dump)
         return E_ERR_IO;
 
     HIDP_CAPS Capabilities;
-    if (HidP_GetCaps(PreparsedData, &Capabilities) != HIDP_STATUS_SUCCESS) {
+    if (HidP_GetCaps(PreparsedData, &Capabilities) != HIDP_STATUS_SUCCESS)
+    {
         LOG("HidP_GetCaps failed!");
         return E_ERR_IO;
     }
@@ -333,20 +370,10 @@ int HidDevice::WriteReport(enum E_REPORT_TYPE type, int id, const unsigned char 
         return E_ERR_INV_PARAM;
     }
 
-    if (status == FALSE) {
-        LPVOID lpMsgBuf;
+    if (status == FALSE)
+    {
         DWORD dw = GetLastError();
-        FormatMessage(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER |
-            FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL,
-            dw,
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPTSTR) &lpMsgBuf,
-            0, NULL );
-        LOG("Error: WriteReport, len = %d, HEX: %s, GetLastError = %d (%s)", len+1, BufToHexString(sendbuf, len+1).c_str(), dw, (LPCTSTR)lpMsgBuf);
-        LocalFree(lpMsgBuf);
+        LOG("Error: WriteReport, len = %d, HEX: %s, GetLastError = %d (%s)", len+1, BufToHexString(sendbuf, len+1).c_str(), dw, GetLastErrorMessage(dw).c_str());
     }
 
     return status == 0 ? E_ERR_IO : 0;
@@ -359,21 +386,10 @@ int HidDevice::WriteReportOut(const unsigned char *buffer, int len)
 
     SetLastError(0);
     status = WriteFile(writeHandle, buffer, len, &bytesWritten, NULL);
-
-    if (status == FALSE) {
-        LPVOID lpMsgBuf;
+    if (status == FALSE)
+    {
         DWORD dw = GetLastError();
-        FormatMessage(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER |
-            FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL,
-            dw,
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPTSTR) &lpMsgBuf,
-            0, NULL );
-        LOG("Error: WriteReportOut, len = %d, HEX: %s, GetLastError = %d (%s)", len, BufToHexString(buffer, len).c_str(), dw, (LPCTSTR)lpMsgBuf);
-        LocalFree(lpMsgBuf);
+        LOG("Error: WriteReportOut, len = %d, HEX: %s, GetLastError = %d (%s)", len, BufToHexString(buffer, len).c_str(), dw, GetLastErrorMessage(dw).c_str());
     }
     return status == FALSE ? E_ERR_IO : 0;
 }
@@ -400,6 +416,7 @@ int HidDevice::ReadReport(enum E_REPORT_TYPE type, int id, char *buffer, int *le
         status = ReadFile(readHandle, rcvbuf, *len, &bytesRead, (LPOVERLAPPED)pOverlapped);
         if( !status )
         {
+            DWORD dw = GetLastError();
             if( GetLastError() == ERROR_IO_PENDING )
             {
                 result = WaitForSingleObject(hEventObject, timeout);
@@ -418,7 +435,10 @@ int HidDevice::ReadReport(enum E_REPORT_TYPE type, int id, char *buffer, int *le
                     ResetEvent(hEventObject);
                     return E_ERR_IO;
                 }
-            } else {
+            }
+            else
+            {
+                LOG("Error: ReadReport, GetLastError = %d (%s)", dw, GetLastErrorMessage(dw).c_str());
                 return E_ERR_IO;
             }
         }
