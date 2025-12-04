@@ -11,29 +11,6 @@ void Key(int keyCode, int state);
 int RunScriptAsync(const char* script);
 int Redial(void);
 
-/*
-Note:
-- if two keys are pressed, only the first one is registered
-- volume control buttons works "inside device"
-- handset (+ its cable) is compatible with typical analog phone handset
-
-Reported by HidP_GetCaps:
-Usage Page: b
-Input Report Byte Length: 8
-Output Report Byte Length: 2            // <<< WTF? OutputReportByteLength = 2 while EP4 wMaxPacketSize = 64
-Feature Report Byte Length: 64
-Number of Link Collection Nodes: 8
-Number of Input Button Caps: 10
-Number of InputValue Caps: 1
-Number of InputData Indices: 23
-Number of Output Button Caps: 1
-Number of Output Value Caps: 0
-Number of Output Data Indices: 1
-Number of Feature Button Caps: 0
-Number of Feature Value Caps: 4
-Number of Feature Data Indices: 4
-*/
-
 using namespace nsHidDevice;
 
 namespace
@@ -155,7 +132,7 @@ void HandleReportIn(const uint8_t *report) {
         }
         break;
     case 0x00:
-        // key up or different key
+        // key up
         break;
 
     default:
@@ -222,13 +199,25 @@ void HandleReportIn(const uint8_t *report) {
     lastOffHook = offHook;
 }
 
-int ClearDisplay(HidDevice &dev) {
+int ClearDisplay(void) {
+#ifdef TARGET_WINDOWS7
+    HidDevice &dev = hidDevice;
+#else
+    HidDevice &dev = hidDeviceDisplay;
+#endif // TARGET_WINDOWS7
     return dev.WriteReportOut(DISPLAY_CLEAR, sizeof(DISPLAY_CLEAR));
 }
 
-int SetDisplayTwoLines(HidDevice &dev, HidDevice &displayDev, const std::string &line1, const std::string &line2="") {
+int SetDisplayTwoLines(const std::string &line1, const std::string &line2="") {
     int status = 0;
 
+#ifdef TARGET_WINDOWS7
+    HidDevice &dev = hidDevice;
+    enum { LINE_SEL_SIZE = 2 };
+#else
+    HidDevice &dev = hidDeviceDisplay;
+    enum { LINE_SEL_SIZE = 3 };
+#endif // TARGET_WINDOWS7
     status = dev.WriteReportOut(TEXT_MODE_TWO_LINES, sizeof(TEXT_MODE_TWO_LINES));
     if (status != 0)
         return status;
@@ -237,15 +226,16 @@ int SetDisplayTwoLines(HidDevice &dev, HidDevice &displayDev, const std::string 
         std::string text;
         if (i == 0) {
             text = line1;
-            status = dev.WriteReportOut(TEXT_TOP_LINE, 2); //sizeof(TEXT_TOP_LINE));
+            status = dev.WriteReportOut(TEXT_TOP_LINE, LINE_SEL_SIZE);
             if (status != 0) {
-                // when trying to write 3 bytes: GetLastError = 1784 (The supplied user buffer is not valid for the requested operation.)
+                // when trying to write 3 bytes on Windows 7: GetLastError = 1784 (The supplied user buffer is not valid for the requested operation.)
+                // on Windows 10 this is fine
                 LOG("Error writing TEXT_TOP_LINE");
                 return status;
             }
         } else {
             text = line2;
-            status = dev.WriteReportOut(TEXT_BOTTOM_LINE, 2); //sizeof(TEXT_BOTTOM_LINE));
+            status = dev.WriteReportOut(TEXT_BOTTOM_LINE, LINE_SEL_SIZE);
             if (status != 0) {
                 LOG("Error writing TEXT_BOTTOM_LINE");
                 return status;
@@ -270,36 +260,19 @@ int SetDisplayTwoLines(HidDevice &dev, HidDevice &displayDev, const std::string 
                 buffer[pos++] = chunk[j];
                 buffer[pos++] = 0x00;             // filler
             }
-        #if 1
-            // trying to write 18 bytes: this works under Linux but not under Windows 7/10
-            status = displayDev.WriteReportOut(buffer, sizeof(buffer));
+            status = hidDeviceDisplay.WriteReportOut(buffer, sizeof(buffer));
             if (status != 0) {
                 LOG("Error trying to write whole buffer");
                 return status;
             }
-        #else
-            // trying to split buffer
-            Sleep(10);
-            for (unsigned int j=0; j<sizeof(buffer)/2; j++) {
-                LOG("j = %u, writing 0x%02X, 0x%02X", j, buffer[j*2], buffer[j*2+1]);
-                status = dev.WriteReportOut(&buffer[j*2], 2);
-                if (status != 0)
-                    return status;
-                Sleep(10);
-            }
-        #endif
         }
     }
     return status;
 }
 
-int UpdateDisplay(HidDevice &dev, HidDevice &displayDev) {
-    int status;
+int UpdateDisplay(void) {
     displayUpdateFlag = false;
-
     std::string callDisplayVal = GetCallDisplay();
-
-    status = 0;
     /** \note Do not clear display here - it is redundant and causes flickering */
 
     char line1[32];
@@ -321,7 +294,7 @@ int UpdateDisplay(HidDevice &dev, HidDevice &displayDev) {
         line1[0] = ' ';
     if (line2[0] == '\0')
         line2[0] = ' ';
-    status = SetDisplayTwoLines(dev, displayDev, line1, line2);
+    int status = SetDisplayTwoLines(line1, line2);
 
     if (status != 0) {
         LOG("UpdateDisplay status/error = %d", status);
@@ -329,25 +302,18 @@ int UpdateDisplay(HidDevice &dev, HidDevice &displayDev) {
     return status;
 }
 
-int UpdateRing(HidDevice &dev) {
-    int status;
-
-    ringUpdateFlag = false;
-
-
-    LOG("UpdateRing: state = %d, type = %u", ringState, customConf.ringType);
-
-    status = 0;
-    Sleep(10);
-    return status;
+int UpdateRing(void) {
+    // Does CX300 has a ringer? Probably not.
+    DET_LOG("UpdateRing: state = %d, type = %u", ringState, customConf.ringType);
+    return 0;
 }
 
 
-int SendKeepalive(HidDevice &dev) {
+int SendKeepalive(void) {
     // Send feature report - without this the phone asks to upgrade Office Communicator
     // report id = 0x17, language (0x09 = EN)
     unsigned char sendbuf[] = {0x17, 0x09, 0x04, 0x01, 0x02};
-    int status = dev.WriteReport(HidDevice::E_REPORT_FEATURE, sendbuf[0], sendbuf+1, sizeof(sendbuf)-1);
+    int status = hidDeviceDisplay.WriteReport(HidDevice::E_REPORT_FEATURE, sendbuf[0], sendbuf+1, sizeof(sendbuf)-1);
     if (status != 0) {
         LOG("Error sending keepalive: %s", HidDevice::GetErrorDesc(status).c_str());
     } else {
@@ -356,13 +322,11 @@ int SendKeepalive(HidDevice &dev) {
     return status;
 }
 
-int SetLed(HidDevice &dev, const uint8_t *leds, bool voicemail) {
+int SetLed(const uint8_t *leds, bool voicemail) {
     // According to Wireshark this sends 3 bytes, not 2.
     // Python with cx300.py and hid/hidapi behaves the same way under Windows.
     // WTF?
-
-    // temporary buffer to make sure third byte is set to 0, otherwise with third byte by = 0x16
-    // voicemail LED is lit and mute LED is lit
+    // it looks like third byte controls voicemail LED and speakerphone
     uint8_t buf[64];
     memset(buf, 0, sizeof(buf));
     memcpy(buf, leds, sizeof(STATUS_LED_GREEN));
@@ -371,7 +335,13 @@ int SetLed(HidDevice &dev, const uint8_t *leds, bool voicemail) {
         buf[2] |= 0x06;
     }
     int status;
+#ifdef TARGET_WINDOWS7
+    HidDevice &dev = hidDevice;
     status = dev.WriteReportOut(buf, sizeof(STATUS_LED_GREEN));
+#else
+    HidDevice &dev = hidDeviceDisplay;
+    status = dev.WriteReportOut(buf, sizeof(STATUS_LED_GREEN)+1);
+#endif // TARGET_WINDOWS7
     if (status != 0) {
         LOG("SetLed status/error = %d", status);
     }
@@ -412,18 +382,18 @@ void PolycomCX300::Poll(void) {
                     }
                 }
 
-                status = SendKeepalive(hidDevice);
+                status = SendKeepalive();
                 if (status != 0) {
                     hidDevice.Close();
                     hidDeviceDisplay.Close();
                 } else {
-                    ClearDisplay(hidDevice);
+                    ClearDisplay();
 
                     const uint8_t* leds[] = {   STATUS_LED_GREEN, STATUS_LED_RED, STATUS_LED_ORANGE_RED,
                                                 STATUS_LED_ORANGE, STATUS_LED_GREEN_ORANGE, STATUS_LED_OFF  };
                     for (unsigned int i=0; i<sizeof(leds)/sizeof(leds[0]); i++) {
                         //LOG("Writing LED pattern #%u", i);
-                        status = SetLed(hidDevice, leds[i], false);
+                        status = SetLed(leds[i], false);
                         if (status != 0) {
                             LOG("Error writing LED pattern #%u", i);
                             hidDevice.Close();
@@ -450,28 +420,28 @@ void PolycomCX300::Poll(void) {
             bool voicemail = (mwiNewMessages > 0);
             if (ringState) {
                 if ((loopCnt & 0x07) == 0) {
-                    status = SetLed(hidDevice, STATUS_LED_RED, voicemail);
+                    status = SetLed(STATUS_LED_RED, voicemail);
                 } else {
-                    status = SetLed(hidDevice, STATUS_LED_OFF, voicemail);
+                    status = SetLed(STATUS_LED_OFF, voicemail);
                 }
             } else {
                 if (regState)
-                    status = SetLed(hidDevice, STATUS_LED_GREEN, voicemail);
+                    status = SetLed(STATUS_LED_GREEN, voicemail);
                 else
-                    status = SetLed(hidDevice, STATUS_LED_OFF, voicemail);
+                    status = SetLed(STATUS_LED_OFF, voicemail);
             }
         }
 
         if (status == 0 && ((loopCnt & 0x1FF) == 0)) {
-            status = SendKeepalive(hidDevice);
+            status = SendKeepalive();
         }
-#if 1
+
         if (status == 0 && displayUpdateFlag) {
-            status = UpdateDisplay(hidDevice, hidDeviceDisplay);
+            status = UpdateDisplay();
         }
-#endif
+
         if (status == 0 && ringUpdateFlag) {
-            status = UpdateRing(hidDevice);
+            status = UpdateRing();
         }
 
         if (status) {
@@ -504,7 +474,7 @@ void PolycomCX300::Poll(void) {
 
 void PolycomCX300::Close(void) {
     if (hidDevice.IsOpened() && hidDeviceDisplay.IsOpened()) {
-        SetDisplayTwoLines(hidDevice, hidDeviceDisplay, "Softphone closed", "");
+        SetDisplayTwoLines("Softphone closed", "");
     }
     hidDevice.Close();
     hidDeviceDisplay.Close();
@@ -524,7 +494,6 @@ void UpdateRing(int state) {
         ringUpdateFlag = true;
     }
     //LOG("ringState = %d", ringState);
-    // Does CX300 has a ringer? Probably not.
 }
 
 void UpdateMwi(int accountId, unsigned int newMsg, unsigned int oldMsg) {
