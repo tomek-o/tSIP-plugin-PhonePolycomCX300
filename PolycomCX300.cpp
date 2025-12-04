@@ -251,13 +251,7 @@ int SetDisplayTwoLines(HidDevice &dev, HidDevice &displayDev, const std::string 
                 return status;
             }
         }
-#if 0
-            status = dev.WriteReportOut(TEXT_END, sizeof(TEXT_END));
-            if (status != 0) {
-                LOG("Error writing TEXT_END");
-                return status;
-            }
-#endif
+
         enum { CHUNK_LENGTH = 8 };
         for (unsigned int textPos = 0; textPos < text.length(); textPos += CHUNK_LENGTH) {
             uint8_t buffer[1 + 1 + (2*CHUNK_LENGTH)];
@@ -377,8 +371,10 @@ int SetLed(HidDevice &dev, const uint8_t *leds, bool voicemail) {
         buf[2] |= 0x06;
     }
     int status;
-    status = hidDevice.WriteReportOut(buf, sizeof(STATUS_LED_GREEN));
-    //status = hidDevice.WriteReport(HidDevice::E_REPORT_OUT, 0, STATUS_LED_GREEN, sizeof(STATUS_LED_GREEN));
+    status = dev.WriteReportOut(buf, sizeof(STATUS_LED_GREEN));
+    if (status != 0) {
+        LOG("SetLed status/error = %d", status);
+    }
     return status;
 }
 
@@ -407,7 +403,12 @@ void PolycomCX300::Poll(void) {
                         once = true;
                         std::string dump;
                         status = hidDevice.DumpCapabilities(dump);
-                        LOG("%s", dump.c_str());
+                        LOG("HID device: %s", dump.c_str());
+                        if (status == 0) {
+                            dump.clear();
+                            status = hidDeviceDisplay.DumpCapabilities(dump);
+                            LOG("HID display device: %s", dump.c_str());
+                        }
                     }
                 }
 
@@ -415,24 +416,23 @@ void PolycomCX300::Poll(void) {
                 if (status != 0) {
                     hidDevice.Close();
                     hidDeviceDisplay.Close();
-                }
+                } else {
+                    ClearDisplay(hidDevice);
 
-                ClearDisplay(hidDevice);
-
-                const uint8_t* leds[] = {   STATUS_LED_GREEN, STATUS_LED_RED, STATUS_LED_ORANGE_RED,
-                                            STATUS_LED_ORANGE, STATUS_LED_GREEN_ORANGE, STATUS_LED_OFF  };
-                for (unsigned int i=0; i<sizeof(leds)/sizeof(leds[0]); i++) {
-                    //LOG("Writing LED pattern #%u", i);
-                    status = SetLed(hidDevice, leds[i], false);
-                    if (status != 0) {
-                        LOG("Error writing LED pattern");
-                        hidDevice.Close();
-                        hidDeviceDisplay.Close();
-                        break;
+                    const uint8_t* leds[] = {   STATUS_LED_GREEN, STATUS_LED_RED, STATUS_LED_ORANGE_RED,
+                                                STATUS_LED_ORANGE, STATUS_LED_GREEN_ORANGE, STATUS_LED_OFF  };
+                    for (unsigned int i=0; i<sizeof(leds)/sizeof(leds[0]); i++) {
+                        //LOG("Writing LED pattern #%u", i);
+                        status = SetLed(hidDevice, leds[i], false);
+                        if (status != 0) {
+                            LOG("Error writing LED pattern #%u", i);
+                            hidDevice.Close();
+                            hidDeviceDisplay.Close();
+                            break;
+                        }
+                        Sleep(300);
                     }
-                    Sleep(300);
                 }
-
             } else {
                 LOG("Error opening HID device: %s", HidDevice::GetErrorDesc(status).c_str());
             }
