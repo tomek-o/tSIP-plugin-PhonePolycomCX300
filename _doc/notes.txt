@@ -1,0 +1,37 @@
+- if two keys are pressed, only the first one is registered
+- volume control buttons work "inside device"
+- handset (+ its cable) is compatible with typical analog phone handset
+- activating shortly hook switch generates HOLD event identical to key from the middle of first row
+
+
+Reported by HidP_GetCaps:
+
+Usage Page: 0x0b
+Input Report Byte Length: 8
+Output Report Byte Length: 2
+Feature Report Byte Length: 64
+Number of Link Collection Nodes: 8
+Number of Input Button Caps: 10
+Number of InputValue Caps: 1
+Number of InputData Indices: 23
+Number of Output Button Caps: 1
+Number of Output Value Caps: 0
+Number of Output Data Indices: 1
+Number of Feature Button Caps: 0
+Number of Feature Value Caps: 4
+Number of Feature Data Indices: 4
+
+Usage Page: 0xff99
+Input Report Byte Length: 0
+Output Report Byte Length: 18
+Feature Report Byte Length: 5
+Number of Link Collection Nodes: 8
+Number of Input Button Caps: 0
+Number of InputValue Caps: 0
+Number of InputData Indices: 0
+Number of Output Button Caps: 10
+Number of Output Value Caps: 5
+Number of Output Data Indices: 24
+Number of Feature Button Caps: 1
+Number of Feature Value Caps: 6
+Number of Feature Data Indices: 16
