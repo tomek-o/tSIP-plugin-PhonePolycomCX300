@@ -474,7 +474,11 @@ void PolycomCX300::Poll(void) {
 
 void PolycomCX300::Close(void) {
     if (hidDevice.IsOpened() && hidDeviceDisplay.IsOpened()) {
-        SetDisplayTwoLines("Softphone closed", "");
+        int status;
+        status = SetDisplayTwoLines("Softphone closed", "");
+        if (status == 0) {
+			SetLed(STATUS_LED_OFF, false);
+        }
     }
     hidDevice.Close();
     hidDeviceDisplay.Close();
