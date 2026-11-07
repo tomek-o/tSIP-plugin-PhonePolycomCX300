@@ -2,9 +2,13 @@
 #include "HidDevice.h"
 #include "Log.h"
 #include "CustomConf.h"
+#include "ExtraText.h"
 #include "Mutex.h"
 #include "ScopedLock.h"
-#include "..\tSIP\tSIP\phone\Phone.h"
+#include "../tSIP/tSIP/phone/Phone.h"
+#include <stdint.h>
+#include <string.h>
+#include <string>
 #include <time.h>
 
 void Key(int keyCode, int state);
@@ -65,6 +69,18 @@ bool ringUpdateFlag = false;
 unsigned int mwiNewMessages = 0;
 
 HidDevice hidDevice, hidDeviceDisplay;
+
+/** Display/LED/keepalive reports go through the vendor-page (0xFF99) device.
+    When it is unavailable or its writes fail (e.g. Wine exposes the whole
+    interface as one HID device) these features are disabled, telephony keeps working. */
+bool displayAvailable = false;
+
+void DisableDisplay(const char* what, int status) {
+    if (displayAvailable) {
+        LOG("%s failed (status = %d), disabling display/LED/keepalive support", what, status);
+        displayAvailable = false;
+    }
+}
 
 const E_KEY KEY_NONE = static_cast<E_KEY>(-1);
 enum E_KEY lastKey = KEY_NONE;
@@ -200,15 +216,22 @@ void HandleReportIn(const uint8_t *report) {
 }
 
 int ClearDisplay(void) {
+    if (!displayAvailable)
+        return 0;
 #ifdef TARGET_WINDOWS7
     HidDevice &dev = hidDevice;
 #else
     HidDevice &dev = hidDeviceDisplay;
 #endif // TARGET_WINDOWS7
-    return dev.WriteReportOut(DISPLAY_CLEAR, sizeof(DISPLAY_CLEAR));
+    int status = dev.WriteReportOut(DISPLAY_CLEAR, sizeof(DISPLAY_CLEAR));
+    if (status != 0) {
+        DisableDisplay("ClearDisplay", status);
+        return 0;
+    }
+    return status;
 }
 
-int SetDisplayTwoLines(const std::string &line1, const std::string &line2="") {
+int SetDisplayTwoLinesImpl(const std::string &line1, const std::string &line2) {
     int status = 0;
 
 #ifdef TARGET_WINDOWS7
@@ -270,6 +293,17 @@ int SetDisplayTwoLines(const std::string &line1, const std::string &line2="") {
     return status;
 }
 
+int SetDisplayTwoLines(const std::string &line1, const std::string &line2="") {
+    if (!displayAvailable)
+        return 0;
+    int status = SetDisplayTwoLinesImpl(line1, line2);
+    if (status != 0) {
+        DisableDisplay("SetDisplayTwoLines", status);
+        return 0;
+    }
+    return status;
+}
+
 int UpdateDisplay(void) {
     displayUpdateFlag = false;
     std::string callDisplayVal = GetCallDisplay();
@@ -279,6 +313,7 @@ int UpdateDisplay(void) {
     char line2[32];
     memset(line1, 0, sizeof(line1));
     memset(line2, 0, sizeof(line2));
+    std::string extraText;
 
     if (callState == 0 && callDisplay.empty()) {
         time_t rawtime;
@@ -287,6 +322,7 @@ int UpdateDisplay(void) {
         timeinfo = localtime (&rawtime);
         strftime (line1, sizeof(line1), "%A %Y-%m-%d", timeinfo);
         strftime (line2, sizeof(line2), "%H:%M:%S", timeinfo);
+        extraText = ExtraText::Get();   // shown only on idle screen, after the clock
     } else {
         strncpy(line1, callDisplayVal.c_str(), sizeof(line1)-1);
     }
@@ -294,7 +330,11 @@ int UpdateDisplay(void) {
         line1[0] = ' ';
     if (line2[0] == '\0')
         line2[0] = ' ';
-    int status = SetDisplayTwoLines(line1, line2);
+    std::string line2Str = line2;
+    if (!extraText.empty()) {
+        line2Str += customConf.extraTextSeparator + extraText;
+    }
+    int status = SetDisplayTwoLines(line1, line2Str);
 
     if (status != 0) {
         LOG("UpdateDisplay status/error = %d", status);
@@ -310,12 +350,16 @@ int UpdateRing(void) {
 
 
 int SendKeepalive(void) {
+    if (!displayAvailable)
+        return 0;
     // Send feature report - without this the phone asks to upgrade Office Communicator
     // report id = 0x17, language (0x09 = EN)
     unsigned char sendbuf[] = {0x17, 0x09, 0x04, 0x01, 0x02};
     int status = hidDeviceDisplay.WriteReport(HidDevice::E_REPORT_FEATURE, sendbuf[0], sendbuf+1, sizeof(sendbuf)-1);
     if (status != 0) {
         LOG("Error sending keepalive: %s", HidDevice::GetErrorDesc(status).c_str());
+        DisableDisplay("SendKeepalive", status);
+        return 0;
     } else {
         DET_LOG("Keepalive sent");
     }
@@ -323,6 +367,8 @@ int SendKeepalive(void) {
 }
 
 int SetLed(const uint8_t *leds, bool voicemail) {
+    if (!displayAvailable)
+        return 0;
     // According to Wireshark this sends 3 bytes, not 2.
     // Python with cx300.py and hid/hidapi behaves the same way under Windows.
     // WTF?
@@ -344,6 +390,8 @@ int SetLed(const uint8_t *leds, bool voicemail) {
 #endif // TARGET_WINDOWS7
     if (status != 0) {
         LOG("SetLed status/error = %d", status);
+        DisableDisplay("SetLed", status);
+        return 0;
     }
     return status;
 }
@@ -354,6 +402,13 @@ int SetLed(const uint8_t *leds, bool voicemail) {
 
 void PolycomCX300::Poll(void) {
     static unsigned int loopCnt = 0;
+
+    // extra display text can be updated regardless of the phone connection state
+    ExtraText::Poll();
+    if (ExtraText::ConsumeChanged()) {
+        DET_LOG("Extra text changed: \"%s\"", ExtraText::Get().c_str());
+        displayUpdateFlag = true;
+    }
     if (!hidDevice.IsOpened()) {
         if (loopCnt % 200 == 0) {
             int status = hidDevice.Open(VendorID, ProductID, NULL, NULL, BasicUsagePage);
@@ -361,10 +416,16 @@ void PolycomCX300::Poll(void) {
                 LOG("HID device for telephony connected");
                 status = hidDeviceDisplay.Open(VendorID, ProductID, NULL, NULL, DisplayUsagePage);
                 if (status != 0) {
-                    LOG("Failed to open display HID device");
-                    hidDevice.Close();
-                } else {
+                    // Wine exposes both top-level collections as a single HID device:
+                    // reuse the same device node for the vendor-page reports.
+                    LOG("Display HID collection not found as separate device, trying shared device");
+                    status = hidDeviceDisplay.Open(VendorID, ProductID, NULL, NULL, -1);
+                }
+                displayAvailable = (status == 0);
+                if (displayAvailable) {
                     LOG("HID device for display connected");
+                } else {
+                    LOG("Display HID device unavailable, running with telephony only");
                 }
 
                 if (customConf.detailedLogging) {
@@ -374,7 +435,7 @@ void PolycomCX300::Poll(void) {
                         std::string dump;
                         status = hidDevice.DumpCapabilities(dump);
                         LOG("HID device: %s", dump.c_str());
-                        if (status == 0) {
+                        if (status == 0 && displayAvailable) {
                             dump.clear();
                             status = hidDeviceDisplay.DumpCapabilities(dump);
                             LOG("HID display device: %s", dump.c_str());
@@ -389,18 +450,23 @@ void PolycomCX300::Poll(void) {
                 } else {
                     ClearDisplay();
 
-                    const uint8_t* leds[] = {   STATUS_LED_GREEN, STATUS_LED_RED, STATUS_LED_ORANGE_RED,
-                                                STATUS_LED_ORANGE, STATUS_LED_GREEN_ORANGE, STATUS_LED_OFF  };
-                    for (unsigned int i=0; i<sizeof(leds)/sizeof(leds[0]); i++) {
-                        //LOG("Writing LED pattern #%u", i);
-                        status = SetLed(leds[i], false);
-                        if (status != 0) {
-                            LOG("Error writing LED pattern #%u", i);
-                            hidDevice.Close();
-                            hidDeviceDisplay.Close();
-                            break;
+                    if (displayAvailable) {
+                        const uint8_t* leds[] = {   STATUS_LED_GREEN, STATUS_LED_RED, STATUS_LED_ORANGE_RED,
+                                                    STATUS_LED_ORANGE, STATUS_LED_GREEN_ORANGE, STATUS_LED_OFF  };
+                        for (unsigned int i=0; i<sizeof(leds)/sizeof(leds[0]); i++) {
+                            //LOG("Writing LED pattern #%u", i);
+                            status = SetLed(leds[i], false);
+                            if (status != 0) {
+                                LOG("Error writing LED pattern #%u", i);
+                                hidDevice.Close();
+                                hidDeviceDisplay.Close();
+                                break;
+                            }
+                            if (!displayAvailable) {
+                                break;
+                            }
+                            Sleep(300);
                         }
-                        Sleep(300);
                     }
                 }
             } else {
@@ -482,6 +548,7 @@ void PolycomCX300::Close(void) {
     }
     hidDevice.Close();
     hidDeviceDisplay.Close();
+    ExtraText::Close();
 }
 
 

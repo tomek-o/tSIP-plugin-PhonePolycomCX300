@@ -1,9 +1,9 @@
 //---------------------------------------------------------------------------
 
 #define _EXPORTING
-#include "..\tSIP\tSIP\phone\Phone.h"
-#include "..\tSIP\tSIP\phone\PhoneSettings.h"
-#include "..\tSIP\tSIP\phone\PhoneCapabilities.h"
+#include "../tSIP/tSIP/phone/Phone.h"
+#include "../tSIP/tSIP/phone/PhoneSettings.h"
+#include "../tSIP/tSIP/phone/PhoneCapabilities.h"
 #include "CommThread.h"
 #include "PolycomCX300.h"
 #include "HidDevice.h"

@@ -7,7 +7,7 @@
 #include <initguid.h>
 extern "C"
 {
-#include <ddk/hidsdi.h>
+#include HID_SDI_HEADER
 #include <setupapi.h>
 }
 #include <dbt.h>

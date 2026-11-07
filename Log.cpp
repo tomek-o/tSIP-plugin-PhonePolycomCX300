@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdarg.h>
-#include <sys\timeb.h>
+#include <sys/timeb.h>
 #include "Log.h"
 #include "Utils.h"
 #include <string>

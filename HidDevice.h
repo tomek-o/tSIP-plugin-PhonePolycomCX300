@@ -15,10 +15,7 @@
 #ifndef HIDDEVICE_H_INCLUDED
 #define HIDDEVICE_H_INCLUDED
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <ddk/hidusage.h>
-#include <ddk/hidpi.h>
+#include "HidHeaders.h"
 #include <windef.h>
 #include <string>
 
